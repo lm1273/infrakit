@@ -7,8 +7,8 @@ services:
     stop_grace_period: 60s
     user: "999:999"
     volumes:
-      - ${DATA_DIR}/${PROJECT_NAME}/postgres:/var/lib/postgresql/data
-      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+      - "${DATA_DIR}/${PROJECT_NAME}/postgres:/var/lib/postgresql/data"
+      - "./init/postgres:/docker-entrypoint-initdb.d:ro"
     command: >
       postgres
       -c shared_buffers=128MB
@@ -86,7 +86,7 @@ services:
         --rename-command DEBUG ""
         ${VALKEY_PERSISTENT:+--save 60 1000 --appendonly yes}
     volumes:
-      - ${DATA_DIR}/${PROJECT_NAME}/valkey:/data
+      - "${DATA_DIR}/${PROJECT_NAME}/valkey:/data"
     ports:
       - "${VALKEY_PORT:-6379}:6379"
     healthcheck:
@@ -107,9 +107,9 @@ services:
     image: dxflrs/garage:v1.1.0
     restart: unless-stopped
     volumes:
-      - ${DATA_DIR}/${PROJECT_NAME}/garage/data:/var/lib/garage/data
-      - ${DATA_DIR}/${PROJECT_NAME}/garage/meta:/var/lib/garage/meta
-      - ./init/garage/garage.toml:/etc/garage.toml:ro
+      - "${DATA_DIR}/${PROJECT_NAME}/garage/data:/var/lib/garage/data"
+      - "${DATA_DIR}/${PROJECT_NAME}/garage/meta:/var/lib/garage/meta"
+      - "./init/garage/garage.toml:/etc/garage.toml:ro"
     environment:
       GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
       GARAGE_ADMIN_TOKEN: ${SERVICE_PASSWORD_64_GARAGE_ADMIN}
@@ -127,9 +127,9 @@ services:
     networks:
       - infrakit
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.garages3.rule=Host(`${GARAGE_S3_API_DOMAIN}`)
-      - traefik.http.services.garages3.loadbalancer.server.port=3900
+      - "traefik.enable=true"
+      - "traefik.http.routers.garages3.rule=Host(`${GARAGE_S3_API_DOMAIN}`)"
+      - "traefik.http.services.garages3.loadbalancer.server.port=3900"
 
   # ── Garage init (bucket + key létrehozás, egyszer fut) ──
   garage-init:
@@ -196,9 +196,9 @@ services:
     networks:
       - infrakit
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.glitchtip.rule=Host(`${GLITCHTIP_DOMAIN}`)
-      - traefik.http.services.glitchtip.loadbalancer.server.port=8000
+      - "traefik.enable=true"
+      - "traefik.http.routers.glitchtip.rule=Host(`${GLITCHTIP_DOMAIN}`)"
+      - "traefik.http.services.glitchtip.loadbalancer.server.port=8000"
 
   # ── GlitchTip Celery worker ──
   glitchtip-worker:
@@ -247,7 +247,7 @@ services:
     image: louislam/uptime-kuma:latest
     restart: unless-stopped
     volumes:
-      - ${DATA_DIR}/${PROJECT_NAME}/uptime-kuma:/app/data
+      - "${DATA_DIR}/${PROJECT_NAME}/uptime-kuma:/app/data"
     deploy:
       resources:
         limits:
@@ -261,7 +261,7 @@ services:
     image: machines/filestash:latest
     restart: unless-stopped
     volumes:
-      - ${DATA_DIR}/${PROJECT_NAME}/filestash:/app/data/state
+      - "${DATA_DIR}/${PROJECT_NAME}/filestash:/app/data/state"
     deploy:
       resources:
         limits:
@@ -309,7 +309,7 @@ services:
     container_name: infrakit-caddy
     restart: unless-stopped
     volumes:
-      - ./init/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - "./init/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
     networks:
       - infrakit
     depends_on:
@@ -333,8 +333,8 @@ services:
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
     volumes:
-      - ${DATA_DIR}/${PROJECT_NAME}/tailscale:/var/lib/tailscale
-      - /dev/net/tun:/dev/net/tun
+      - "${DATA_DIR}/${PROJECT_NAME}/tailscale:/var/lib/tailscale"
+      - "/dev/net/tun:/dev/net/tun"
     cap_add:
       - net_admin
       - sys_module

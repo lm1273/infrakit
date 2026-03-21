@@ -14,7 +14,7 @@ RUN bun run build
 
 # Futtató környezet
 FROM base AS release
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=install /app/node_modules node_modules
 COPY --from=build /app/.output .output
 COPY --from=build /app/package.json .

@@ -14,12 +14,15 @@ RUN bun run build
 
 # Futtató környezet
 FROM base AS release
+RUN apk add --no-cache curl
 COPY --from=install /app/node_modules node_modules
 COPY --from=build /app/.output .output
 COPY --from=build /app/package.json .
+COPY setup-garage.sh /app/setup-garage.sh
+RUN chmod +x /app/setup-garage.sh
 
 # A TanStack Start server default portja
 EXPOSE 3000
 
 ENV NODE_ENV=production
-CMD [ "bun", "run", "start" ]
+CMD ./setup-garage.sh && bun run start

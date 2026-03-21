@@ -1,7 +1,6 @@
 services:
 
   # -- PostgreSQL --
-  # Note: running as root internally (default) to allow automatic chown of host volumes
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -73,29 +72,8 @@ services:
       - infrakit
     labels:
       - "traefik.enable=true"
-      # IMPORTANT: Remove https:// from GLITCHTIP_DOMAIN and GARAGE_S3_API_DOMAIN in Coolify UI!
       - "traefik.http.routers.garages3.rule=Host(`${GARAGE_S3_API_DOMAIN}`)"
       - "traefik.http.services.garages3.loadbalancer.server.port=3900"
-
-  # -- Garage Init --
-  garage-init:
-    image: dxflrs/garage:v1.1.0
-    depends_on:
-      - garage
-    restart: "no"
-    entrypoint: >
-      /bin/sh -c "
-        sleep 10;
-        NODE_ID=$$(garage -h http://garage:3903 node id -q | cut -c1-16);
-        garage -h http://garage:3903 layout assign $$NODE_ID -z dc1 -c ${STORAGE_CAPACITY:-1G} 2>/dev/null || true;
-        garage -h http://garage:3903 layout apply --version 1 2>/dev/null || true;
-        garage -h http://garage:3903 key import --name app-key ${SERVICE_PASSWORD_64_GARAGE_ACCESS} ${SERVICE_PASSWORD_64_GARAGE_SECRET} 2>/dev/null || true;
-        garage -h http://garage:3903 bucket create ${STORAGE_BUCKET:-uploads} 2>/dev/null || true;
-        garage -h http://garage:3903 bucket allow ${STORAGE_BUCKET:-uploads} --read --write --owner --key app-key 2>/dev/null || true;
-        echo Done;
-      "
-    networks:
-      - infrakit
 
   # -- GlitchTip --
   glitchtip:
@@ -163,7 +141,7 @@ services:
     networks:
       - infrakit
 
-  # -- InfraPanel --
+  # -- InfraPanel & Garage Setup --
   infrapanel:
     build:
       context: ./infrapanel
@@ -179,6 +157,9 @@ services:
       - STORAGE_ACCESS_KEY_ID=${SERVICE_PASSWORD_64_GARAGE_ACCESS}
       - STORAGE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_64_GARAGE_SECRET}
       - STORAGE_BUCKET=${STORAGE_BUCKET}
+      - STORAGE_CAPACITY=${STORAGE_CAPACITY:-1G}
+      - GARAGE_ADMIN_TOKEN=${SERVICE_PASSWORD_64_GARAGE_ADMIN}
+      - GARAGE_RPC_SECRET=${SERVICE_PASSWORD_64_GARAGE_RPC}
       - GLITCHTIP_DOMAIN=${GLITCHTIP_DOMAIN}
       - FILESTASH_DOMAIN=${FILESTASH_DOMAIN}
       - UPTIME_KUMA_DOMAIN=${UPTIME_KUMA_DOMAIN}
@@ -189,7 +170,7 @@ services:
       valkey:
         condition: service_healthy
       garage:
-        condition: service_healthy
+        condition: service_started
 
   # -- Caddy --
   caddy-internal:
@@ -205,7 +186,7 @@ services:
       - filestash
       - uptime-kuma
 
-  # -- Tailscale VPN (Userspace Mode) --
+  # -- Tailscale VPN --
   tailscale-vpn:
     image: tailscale/tailscale:latest
     restart: unless-stopped

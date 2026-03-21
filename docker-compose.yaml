@@ -7,7 +7,7 @@ services:
     stop_grace_period: 60s
     user: "999:999"
     volumes:
-      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/postgres:/var/lib/postgresql/data
+      - ${DATA_DIR}/${PROJECT_NAME}/postgres:/var/lib/postgresql/data
       - ./init/postgres:/docker-entrypoint-initdb.d:ro
     command: >
       postgres
@@ -86,7 +86,7 @@ services:
         --rename-command DEBUG ""
         ${VALKEY_PERSISTENT:+--save 60 1000 --appendonly yes}
     volumes:
-      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/valkey:/data
+      - ${DATA_DIR}/${PROJECT_NAME}/valkey:/data
     ports:
       - "${VALKEY_PORT:-6379}:6379"
     healthcheck:
@@ -107,14 +107,13 @@ services:
     image: dxflrs/garage:v1.1.0
     restart: unless-stopped
     volumes:
-      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/garage/data:/var/lib/garage/data
-      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/garage/meta:/var/lib/garage/meta
+      - ${DATA_DIR}/${PROJECT_NAME}/garage/data:/var/lib/garage/data
+      - ${DATA_DIR}/${PROJECT_NAME}/garage/meta:/var/lib/garage/meta
       - ./init/garage/garage.toml:/etc/garage.toml:ro
     environment:
       GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
       GARAGE_ADMIN_TOKEN: ${SERVICE_PASSWORD_64_GARAGE_ADMIN}
-    # ports: Törölve! Coolify Traefik ezen keresztül hivatkozik rá:
-    # - "3900" (nem jelenik meg a hoston)
+    # (Portok a Traefiken keresztul)
     healthcheck:
       test: ["CMD-SHELL", "(echo > /dev/tcp/localhost/3900) 2>/dev/null || exit 1"]
       interval: 10s
@@ -183,7 +182,7 @@ services:
       GLITCHTIP_SUPERUSER_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       CELERY_WORKER_CONCURRENCY: "1"
       WEB_CONCURRENCY: "1"
-    # ports: Törölve! (Biztonság: Csak Traefiken keresztül érhető el HTTPS-sel)
+    # (Portok a Traefiken keresztul)
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8000/_health/ || exit 1"]
       interval: 15s
@@ -229,7 +228,7 @@ services:
   adminer:
     image: adminer:latest
     restart: unless-stopped
-    # ports: Törölve DB adminisztrátor ne legyen elérhető HTTP host interface-en!
+    # (Portok titkositva)
     environment:
       ADMINER_DEFAULT_SERVER: postgres
       ADMINER_DESIGN: pepa-linha
@@ -248,7 +247,7 @@ services:
     image: louislam/uptime-kuma:latest
     restart: unless-stopped
     volumes:
-      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/uptime-kuma:/app/data
+      - ${DATA_DIR}/${PROJECT_NAME}/uptime-kuma:/app/data
     deploy:
       resources:
         limits:
@@ -262,7 +261,7 @@ services:
     image: machines/filestash:latest
     restart: unless-stopped
     volumes:
-      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/filestash:/app/data/state
+      - ${DATA_DIR}/${PROJECT_NAME}/filestash:/app/data/state
     deploy:
       resources:
         limits:
@@ -334,7 +333,7 @@ services:
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
     volumes:
-      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/tailscale:/var/lib/tailscale
+      - ${DATA_DIR}/${PROJECT_NAME}/tailscale:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
     cap_add:
       - net_admin

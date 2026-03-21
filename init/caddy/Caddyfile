@@ -1,0 +1,25 @@
+# Caddyfile a belső Tailscale proxy-hoz
+# Engedélyezzük a HTTPS nélküli lokális proxyt
+{
+	auto_https off
+}
+
+# Adminer
+:8080 {
+	reverse_proxy adminer:8080
+}
+
+# Uptime Kuma
+:3001 {
+	reverse_proxy uptime-kuma:3001
+}
+
+# Filestash
+:8334 {
+	reverse_proxy filestash:8334
+}
+
+# InfraPanel
+:3000 {
+	reverse_proxy infrapanel:3000
+}

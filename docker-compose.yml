@@ -1,0 +1,350 @@
+services:
+
+  # ── PostgreSQL ──
+  postgres:
+    image: postgres:16-alpine # Kisebb Alpine image az optimalizációhoz
+    restart: unless-stopped
+    stop_grace_period: 60s
+    user: "999:999"
+    volumes:
+      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/postgres:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c work_mem=8MB
+      -c maintenance_work_mem=64MB
+      -c effective_cache_size=256MB
+      -c max_connections=100
+    environment:
+      POSTGRES_DB: ${DB_NAME:-app}
+      POSTGRES_USER: ${DB_USER:-app}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      POSTGRES_INITDB_ARGS: "--locale=C.UTF-8"
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${PG_MEMORY_LIMIT:-512M}
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - infrakit
+
+  # ── PgBouncer (connection pooler) ──
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-app}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/${DB_NAME:-app}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CONN:-200}
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_POOL_SIZE:-20}
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      MAX_PREPARED_STATEMENTS: 100
+      SERVER_RESET_QUERY: "DISCARD ALL"
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:6432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    logging: *logging
+    networks:
+      - infrakit
+
+  # ── Valkey (Redis fork) ──
+  valkey:
+    image: valkey/valkey:latest
+    restart: unless-stopped
+    command: >
+      valkey-server
+        --maxmemory ${VALKEY_MAXMEMORY:-128mb}
+        --maxmemory-policy allkeys-lru
+        --requirepass ${SERVICE_PASSWORD_64_VALKEY}
+        --rename-command FLUSHALL ""
+        --rename-command FLUSHDB ""
+        --rename-command CONFIG ""
+        --rename-command DEBUG ""
+        ${VALKEY_PERSISTENT:+--save 60 1000 --appendonly yes}
+    volumes:
+      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/valkey:/data
+    ports:
+      - "${VALKEY_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "${SERVICE_PASSWORD_64_VALKEY}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${VALKEY_MEMORY_LIMIT:-128M}
+    logging: *logging
+    networks:
+      - infrakit
+
+  # ── Garage (S3-kompatibilis storage) ──
+  garage:
+    image: dxflrs/garage:v1.1.0
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/garage/data:/var/lib/garage/data
+      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/garage/meta:/var/lib/garage/meta
+      - ./init/garage/garage.toml:/etc/garage.toml:ro
+    environment:
+      GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
+      GARAGE_ADMIN_TOKEN: ${SERVICE_PASSWORD_64_GARAGE_ADMIN}
+    # ports: Törölve! Coolify Traefik ezen keresztül hivatkozik rá:
+    # - "3900" (nem jelenik meg a hoston)
+    healthcheck:
+      test: ["CMD-SHELL", "(echo > /dev/tcp/localhost/3900) 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${GARAGE_MEMORY_LIMIT:-256M}
+    logging: *logging
+    networks:
+      - infrakit
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.garages3.rule=Host(`${GARAGE_S3_API_DOMAIN}`)
+      - traefik.http.services.garages3.loadbalancer.server.port=3900
+
+  # ── Garage init (bucket + key létrehozás, egyszer fut) ──
+  garage-init:
+    image: dxflrs/garage:v1.1.0
+    depends_on:
+      garage:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+        export GARAGE_ADMIN_TOKEN=$${GARAGE_ADMIN_TOKEN};
+        sleep 3;
+        NODE_ID=$$(garage -h http://garage:3903 node id -q | cut -c1-16);
+        garage -h http://garage:3903 layout assign $$NODE_ID -z dc1 -c ${STORAGE_CAPACITY:-1G} 2>/dev/null || true;
+        garage -h http://garage:3903 layout apply --version 1 2>/dev/null || true;
+        garage -h http://garage:3903 key import --name app-key $${STORAGE_ACCESS_KEY} $${STORAGE_SECRET_KEY} 2>/dev/null || true;
+        garage -h http://garage:3903 bucket create $${STORAGE_BUCKET:-uploads} 2>/dev/null || true;
+        garage -h http://garage:3903 bucket allow $${STORAGE_BUCKET:-uploads} --read --write --owner --key app-key 2>/dev/null || true;
+        echo '✅ Garage ready: bucket=$${STORAGE_BUCKET:-uploads}';
+      "
+    environment:
+      GARAGE_ADMIN_TOKEN: ${SERVICE_PASSWORD_64_GARAGE_ADMIN}
+      STORAGE_ACCESS_KEY: ${SERVICE_PASSWORD_64_GARAGE_ACCESS}
+      STORAGE_SECRET_KEY: ${SERVICE_PASSWORD_64_GARAGE_SECRET}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-uploads}
+      STORAGE_CAPACITY: ${STORAGE_CAPACITY:-1G}
+    networks:
+      - infrakit
+
+  # ── GlitchTip (error tracking, Sentry-kompatibilis) ──
+  glitchtip:
+    image: glitchtip/glitchtip:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-app}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/glitchtip
+      VALKEY_URL: redis://:${SERVICE_PASSWORD_64_VALKEY}@valkey:6379/0
+      SECRET_KEY: ${SERVICE_PASSWORD_64_GLITCHTIP}
+      PORT: "8000"
+      GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:-https://errors.designflow.hu}
+      DEFAULT_FROM_EMAIL: ${GLITCHTIP_FROM_EMAIL:-errors@designflow.hu}
+      EMAIL_URL: ${GLITCHTIP_EMAIL_URL:-consolemail://}
+      ENABLE_SOCIAL_AUTH: "false"
+      GLITCHTIP_MAX_EVENT_LIFE_DAYS: ${GLITCHTIP_EVENT_RETENTION:-90}
+      GLITCHTIP_SUPERUSER_EMAIL: ${ADMIN_EMAIL:-admin@designflow.hu}
+      GLITCHTIP_SUPERUSER_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      CELERY_WORKER_CONCURRENCY: "1"
+      WEB_CONCURRENCY: "1"
+    # ports: Törölve! (Biztonság: Csak Traefiken keresztül érhető el HTTPS-sel)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8000/_health/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging: *logging
+    networks:
+      - infrakit
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.glitchtip.rule=Host(`${GLITCHTIP_DOMAIN}`)
+      - traefik.http.services.glitchtip.loadbalancer.server.port=8000
+
+  # ── GlitchTip Celery worker ──
+  glitchtip-worker:
+    image: glitchtip/glitchtip:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    command: bin/run-celery-with-beat.sh
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-app}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/glitchtip
+      VALKEY_URL: redis://:${SERVICE_PASSWORD_64_VALKEY}@valkey:6379/0
+      SECRET_KEY: ${SERVICE_PASSWORD_64_GLITCHTIP}
+      GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:-https://errors.designflow.hu}
+      CELERY_WORKER_CONCURRENCY: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *logging
+    networks:
+      - infrakit
+
+  # ── Adminer (Könnyűsúlyú DB menedzser) ──
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    # ports: Törölve DB adminisztrátor ne legyen elérhető HTTP host interface-en!
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha
+      # PHP mem limit to keep it light
+      PHP_MEMORY_LIMIT: 32M
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+    logging: *logging
+    networks:
+      - infrakit
+
+  # ── Uptime Kuma (health monitoring) ──
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/uptime-kuma:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    logging: *logging
+    networks:
+      - infrakit
+
+  # ── Filestash (S3 web file browser) ──
+  filestash:
+    image: machines/filestash:latest
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/filestash:/app/data/state
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    logging: *logging
+    networks:
+      - infrakit
+
+  # ── InfraPanel (Custom 3rd-party Dashboard) ──
+  infrapanel:
+    build:
+      context: ./infrapanel
+      dockerfile: Dockerfile
+    container_name: infrakit-panel
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PANEL_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - VALKEY_HOST=valkey
+      - VALKEY_PORT=6379
+      - VALKEY_PASSWORD=${SERVICE_PASSWORD_64_VALKEY}
+      - STORAGE_ENDPOINT=http://garage:3900
+      - STORAGE_REGION=${STORAGE_REGION:-us-east-1}
+      - STORAGE_ACCESS_KEY_ID=${SERVICE_PASSWORD_64_GARAGE_ACCESS}
+      - STORAGE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_64_GARAGE_SECRET}
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-uploads}
+      - GLITCHTIP_DOMAIN=${GLITCHTIP_DOMAIN}
+      - FILESTASH_DOMAIN=${FILESTASH_DOMAIN}
+      - UPTIME_KUMA_DOMAIN=${UPTIME_KUMA_DOMAIN}
+      - ADMINER_DOMAIN=${ADMINER_DOMAIN}
+    networks:
+      - infrakit
+    depends_on:
+      - valkey
+      - garage
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging: *logging
+
+  # ── Caddy (Belső Reverse Proxy a VPN-hez) ──
+  caddy-internal:
+    image: caddy:alpine
+    container_name: infrakit-caddy
+    restart: unless-stopped
+    volumes:
+      - ./init/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - infrakit
+    depends_on:
+      - infrapanel
+      - adminer
+      - filestash
+      - uptime-kuma
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+    logging: *logging
+
+  # ── Tailscale (VPN Gateway a belső szolgáltatásokhoz) ──
+  tailscale-vpn:
+    image: tailscale/tailscale:latest
+    container_name: infrakit-tailscale
+    hostname: infrakit-secure
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+    volumes:
+      - ${DATA_DIR:-/opt/infrakit/data}/${PROJECT_NAME:-app}/tailscale:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+      - sys_module
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    logging: *logging
+    network_mode: "service:caddy-internal"
+
+networks:
+  infrakit:

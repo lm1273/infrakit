@@ -1,0 +1,30 @@
+# Environment variables
+.env
+*.env.local
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Dependencies
+node_modules/
+
+# IDEs
+.idea/
+.vscode/
+
+# Build and local files (handled by infrapanel/.gitignore too, but good as a fallback)
+.output/
+.nitro/
+dist/
+build/
+.cache/
+
+# Data directories (just in case they ran setup.sh locally)
+data/
+/data

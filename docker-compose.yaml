@@ -64,13 +64,11 @@ services:
     volumes:
       - "/opt/infrakit/data/designflow/garage/data:/var/lib/garage/data"
       - "/opt/infrakit/data/designflow/garage/meta:/var/lib/garage/meta"
-      - "./init/garage_v2/garage.toml:/etc/garage.toml:ro"
-    command: ["/garage", "server"]
     environment:
       GARAGE_METADATA_DIR: "/var/lib/garage/meta"
       GARAGE_DATA_DIR: "/var/lib/garage/data"
       GARAGE_DB_ENGINE: "lmdb"
-      GARAGE_REPLICATION_FACTOR: 1
+      GARAGE_REPLICATION_FACTOR: "1"
       GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
       GARAGE_RPC__BIND_ADDR: "0.0.0.0:3901"
       GARAGE_ADMIN__API_BIND_ADDR: "0.0.0.0:3903"

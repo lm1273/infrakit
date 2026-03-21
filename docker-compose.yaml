@@ -69,11 +69,6 @@ services:
     environment:
       GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
       GARAGE_ADMIN_TOKEN: ${SERVICE_PASSWORD_64_GARAGE_ADMIN}
-    # Using a simpler check that doesn't rely on /dev/tcp
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep garage || exit 1"]
-      interval: 10s
-      start_period: 10s
     networks:
       - infrakit
     labels:
@@ -86,12 +81,11 @@ services:
   garage-init:
     image: dxflrs/garage:v1.1.0
     depends_on:
-      garage:
-        condition: service_healthy
+      - garage
     restart: "no"
     entrypoint: >
       /bin/sh -c "
-        sleep 5;
+        sleep 10;
         NODE_ID=$$(garage -h http://garage:3903 node id -q | cut -c1-16);
         garage -h http://garage:3903 layout assign $$NODE_ID -z dc1 -c ${STORAGE_CAPACITY:-1G} 2>/dev/null || true;
         garage -h http://garage:3903 layout apply --version 1 2>/dev/null || true;

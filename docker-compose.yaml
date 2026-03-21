@@ -64,7 +64,8 @@ services:
     volumes:
       - "/opt/infrakit/data/designflow/garage/data:/var/lib/garage/data"
       - "/opt/infrakit/data/designflow/garage/meta:/var/lib/garage/meta"
-    # Configuration via environment variables to bypass "Is a directory" volume mount errors
+    # Explicitly use /dev/null to force configuration via environment variables only
+    command: ["/garage", "-c", "/dev/null", "server"]
     environment:
       GARAGE_METADATA_DIR: "/var/lib/garage/meta"
       GARAGE_DATA_DIR: "/var/lib/garage/data"

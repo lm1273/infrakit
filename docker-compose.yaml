@@ -222,8 +222,6 @@ services:
       - TS_USERSPACE=true
     volumes:
       - "/opt/infrakit/data/designflow/tailscale:/var/lib/tailscale"
-    networks:
-      - infrakit
     network_mode: "service:caddy-internal"
 
 networks:

@@ -30,4 +30,4 @@ bun run build
 
 ## Docker
 
-A `Dockerfile` a production buildet szolgálja ki. Az InfraKit stack részeként a `docker-compose.yml` automatikusan buildeli és futtatja.
+A `Dockerfile` a production buildet szolgálja ki. Az InfraKit stack részeként a `docker-compose.yaml` automatikusan buildeli és futtatja.

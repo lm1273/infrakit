@@ -22,7 +22,7 @@
 
 ```
 infrakit/
-├── docker-compose.yml        # Teljes stack
+├── docker-compose.yaml       # Teljes stack
 ├── .env.example              # Konfigurációs sablon
 ├── setup.sh                  # Szerver előkészítő script
 ├── GIT_DEPLOY.md             # Részletes telepítési útmutató

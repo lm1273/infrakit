@@ -1,11 +1,11 @@
 services:
 
   # -- PostgreSQL --
+  # Note: running as root internally (default) to allow automatic chown of host volumes
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     stop_grace_period: 60s
-    user: "999:999"
     volumes:
       - "/opt/infrakit/data/designflow/postgres:/var/lib/postgresql/data"
       - "./init/postgres:/docker-entrypoint-initdb.d:ro"
@@ -18,14 +18,11 @@ services:
     ports:
       - "${PG_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app} -d ${DB_NAME:-app}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+      start_period: 10s
     networks:
       - infrakit
 
@@ -72,13 +69,16 @@ services:
     environment:
       GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
       GARAGE_ADMIN_TOKEN: ${SERVICE_PASSWORD_64_GARAGE_ADMIN}
+    # Using a simpler check that doesn't rely on /dev/tcp
     healthcheck:
-      test: ["CMD-SHELL", "(echo > /dev/tcp/localhost/3900) 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "pgrep garage || exit 1"]
       interval: 10s
+      start_period: 10s
     networks:
       - infrakit
     labels:
       - "traefik.enable=true"
+      # IMPORTANT: Remove https:// from GLITCHTIP_DOMAIN and GARAGE_S3_API_DOMAIN in Coolify UI!
       - "traefik.http.routers.garages3.rule=Host(`${GARAGE_S3_API_DOMAIN}`)"
       - "traefik.http.services.garages3.loadbalancer.server.port=3900"
 

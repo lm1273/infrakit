@@ -65,7 +65,7 @@ services:
     volumes:
       - "/opt/infrakit/data/designflow/garage/data:/var/lib/garage/data"
       - "/opt/infrakit/data/designflow/garage/meta:/var/lib/garage/meta"
-      - "./init/garage:/etc/garage:ro"
+      - "./init/garage/garage_v1.toml:/etc/garage/garage.toml:ro"
     command: ["/garage", "-c", "/etc/garage/garage.toml", "server"]
     environment:
       GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
@@ -179,7 +179,7 @@ services:
     image: caddy:alpine
     restart: unless-stopped
     volumes:
-      - "./init/caddy:/etc/caddy:ro"
+      - "./init/caddy/Caddyfile.conf:/etc/caddy/Caddyfile:ro"
     networks:
       - infrakit
     depends_on:

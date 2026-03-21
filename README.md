@@ -119,82 +119,60 @@ Nyomd meg a **Deploy** gombot → kész.
 
 ---
 
-## Next.js app csatlakoztatás (Vercel)
+## Applikáció csatlakoztatása (pl. Next.js / Node.js)
 
-### Vercel env vars
+Az InfraKit egyik legnagyobb előnye, hogy **nem igényel saját, zárt SDK csomagot**. Mivel az egész stack ipari standard protokollokra (PostgreSQL, Redis, AWS S3) épül, bármelyik modern keretrendszer beépített vagy népszerű komponenseivel natívan tud csatlakozni (zéró vendor lock-in).
+
+A legtisztább megoldás, ha a saját alkalmazásodban (pl. a `src/lib/` mappában) létrehozol egy **egyetlen fájlból álló belső wrapper-t** (pl. `infra.ts`), és ezen keresztül éred el a backendet.
+
+### Példa Vercel / Next.js `.env` változók:
 
 ```env
-# PgBouncer-en át (runtime)
+# PgBouncer-en át (alkalmazás runtime)
 DATABASE_URL=postgresql://designflow:AUTO@db.tedd.hu:6432/designflow?pgbouncing=true
-
-# Közvetlen PG (Prisma migrate — ne felejtsd el a Prisma schema-ba is!)
+# Közvetlen PG (Prisma migrate-hez)
 DIRECT_URL=postgresql://designflow:AUTO@dbdirect.tedd.hu:5432/designflow
 
-# Valkey
+# Valkey (Cache)
 VALKEY_URL=redis://default:AUTO@cache.tedd.hu:6379
 
-# S3 Storage (Garage)
+# Garage (S3 Storage)
 S3_ENDPOINT=https://storage.tedd.hu
 S3_ACCESS_KEY_ID=AUTO_GARAGE_ACCESS
 S3_SECRET_ACCESS_KEY=AUTO_GARAGE_SECRET
-S3_BUCKET=designflow-files
-S3_REGION=garage
 
-# Error tracking
+# GlitchTip (Error tracking)
 SENTRY_DSN=https://AUTO_KEY@errors.tedd.hu/1
 ```
 
-### Prisma schema
+### Példa belső "SDK" kliensed beállítása (`src/lib/infra.ts`):
 
-```prisma
-datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  directUrl  = env("DIRECT_URL")
-}
-```
-
-### `src/lib/infra.ts` (Bun native driverek)
+Szükséges szabványos csomagok: `npm i @aws-sdk/client-s3 ioredis @prisma/client` (vagy drizzle stb.)
 
 ```typescript
-import { S3Client } from "bun";
+import { S3Client } from "@aws-sdk/client-s3";
+import { PrismaClient } from "@prisma/client";
+import Redis from "ioredis";
 
-// Storage — Bun beépített S3 driver
+// 1. ADATBÁZIS (Prisma, PgBounceren keresztül)
+export const db = new PrismaClient(); // A DATABASE_URL-t automatikusan az env-ből olvassa
+
+// 2. CACHE (Valkey)
+export const cache = new Redis(process.env.VALKEY_URL!);
+
+// 3. STORAGE (Garage / S3)
 export const storage = new S3Client({
   endpoint: process.env.S3_ENDPOINT!,
-  accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-  secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-  bucket: process.env.S3_BUCKET!,
-  region: "garage",
+  region: "garage", // igazából mindegy
+  forcePathStyle: true, // FONTOS S3 kompatibilis Storage-oknál!
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+  },
 });
 
-// Cache — Bun beépített Redis/Valkey driver (auto-detects VALKEY_URL)
-export { redis as cache } from "bun";
-
-// Helpers
-export const presignUpload = (key: string, expiresIn = 3600) =>
-  storage.presign(key, { method: "PUT", expiresIn });
-
-export const presignDownload = (key: string, opts?: { expiresIn?: number; fileName?: string }) =>
-  storage.presign(key, {
-    expiresIn: opts?.expiresIn ?? 3600,
-    contentDisposition: opts?.fileName
-      ? `attachment; filename="${opts.fileName}"`
-      : undefined,
-  });
-
-// Health check
-export async function checkInfraHealth() {
-  const [s3ok, redisOk] = await Promise.allSettled([
-    storage.exists("__healthcheck__"),
-    (await import("bun")).redis.ping(),
-  ]);
-  return {
-    storage: s3ok.status === "fulfilled",
-    cache: redisOk.status === "fulfilled",
-    allHealthy: s3ok.status === "fulfilled" && redisOk.status === "fulfilled",
-  };
-}
+// Használat a kódodban bárhol:
+// import { db, cache, storage } from "@/lib/infra";
 ```
 
 ---

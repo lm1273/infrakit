@@ -17,7 +17,7 @@ services:
     ports:
       - "${PG_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app} -d ${DB_NAME:-app}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -64,8 +64,9 @@ services:
     volumes:
       - "/opt/infrakit/data/designflow/garage/data:/var/lib/garage/data"
       - "/opt/infrakit/data/designflow/garage/meta:/var/lib/garage/meta"
-    # Explicitly use /dev/null to force configuration via environment variables only
-    command: ["/garage", "-c", "/dev/null", "server"]
+      - "./init/garage_v2/garage.toml:/etc/garage_config/garage_config_v2.toml:ro"
+    # Use the fresh configuration file path to bypass all host-level directory/file confusion
+    command: ["/garage", "-c", "/etc/garage_config/garage_config_v2.toml", "server"]
     environment:
       GARAGE_METADATA_DIR: "/var/lib/garage/meta"
       GARAGE_DATA_DIR: "/var/lib/garage/data"
@@ -179,6 +180,8 @@ services:
     networks:
       - infrakit
     depends_on:
+      postgres:
+        condition: service_healthy
       valkey:
         condition: service_healthy
       garage:

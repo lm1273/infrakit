@@ -214,9 +214,9 @@ services:
   # -- Tailscale VPN (Userspace Mode) --
   tailscale-vpn:
     image: tailscale/tailscale:latest
-    hostname: infrakit-secure
     restart: unless-stopped
     environment:
+      - TS_HOSTNAME=infrakit-secure
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=true

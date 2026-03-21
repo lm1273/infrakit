@@ -61,10 +61,12 @@ services:
   garage:
     image: dxflrs/garage:v1.1.0
     restart: unless-stopped
+    # Mounting the entire directory to avoid file-vs-directory mount issues
     volumes:
       - "/opt/infrakit/data/designflow/garage/data:/var/lib/garage/data"
       - "/opt/infrakit/data/designflow/garage/meta:/var/lib/garage/meta"
-      - "./init/garage/garage.toml:/etc/garage.toml:ro"
+      - "./init/garage:/etc/garage:ro"
+    command: ["/garage", "server", "-c", "/etc/garage/garage.toml"]
     environment:
       GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
       GARAGE_ADMIN_TOKEN: ${SERVICE_PASSWORD_64_GARAGE_ADMIN}
@@ -177,7 +179,7 @@ services:
     image: caddy:alpine
     restart: unless-stopped
     volumes:
-      - "./init/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
+      - "./init/caddy:/etc/caddy:ro"
     networks:
       - infrakit
     depends_on:

@@ -10,11 +10,15 @@ Ez a dokumentum a lehető legrészletesebben, az alapoktól kezdve mutatja be, h
 Ahhoz, hogy minden szolgáltatás elérhető legyen `https://` (SSL) címen, a Coolify szerverednek rendelkeznie kell egy Publikus IP-címmel. Továbbá a domain szolgáltatódnál (Cloudflare, Rackhost, Nethely stb.) be kell állítanod a domain neved alatt úgynevezett **A rekordokat**, amik a szervered IP-jére mutatnak.
 
 **Példa DNS Rekordokra:**
-Hozd létre a DNS-ben az alábbi A vagy CNAME rekordokat. Ezek a *publikus* szolgáltatásokhoz kellenek:
+Hozd létre a DNS-ben az alábbi A vagy CNAME rekordokat. Ezek a *publikus* webről is elérhető szolgáltatásokhoz kellenek:
 *   `errors` (a GlitchTip-hez) -> IP Cím
 *   `s3` (a Garage Public S3 API-hoz) -> IP Cím
 
-*(Megjegyzés: Az Adminer, Uptime Kuma, Filestash és InfraPanel beépített **Tailscale VPN** mögött fut, így hozzájuk nem kell publikus DNS rekordot felvenned, mert nincsenek kint a weben!)*
+*Opcionális Vercel/Next.js kapcsolatokhoz (Ha nem IP címmel, hanem domainnel akarod a Vercel-ből elérni a nyitott adatbázis portokat):*
+*   `db` (A PgBouncer TCP-hez) -> IP Cím
+*   `cache` (A Valkey TCP-hez) -> IP Cím
+
+*(Megjegyzés: Az Adminer, Uptime Kuma, Filestash és InfraPanel beépített **Tailscale VPN** mögött fut, így hozzájuk nem kell DNS rekordot felvenned, mert nincsenek kint a weben!)*
 
 ---
 

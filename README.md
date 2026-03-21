@@ -250,3 +250,11 @@ Második projekt: +~1.5 GB → ~5.5 GB / 8 GB → még OK
 - ✅ **ÚJ**: Belső eszközök (Adminer, Kuma stb.) teljesen izolálva a publikus webről, beépített Tailscale VPN (Zero Trust).
 - ✅ **ÚJ**: Egységes Admin belépés (ADMIN_EMAIL, ADMIN_PASSWORD) minden újonnan induló felülethez (InfraPanel, GlitchTip, stb.)
 - ✅ Garage admin API nincs publikusan kitéve
+
+### Hogyan éri el a Vercel az adatbázist, ha Zero-Trust van?
+
+A Zero-Trust izolációnk kizárólag a webes **menedzsment felületeket** (Adminer, InfraPanel stb.) rejti el a nyilvánosság elől a Tailscale mögé.
+
+Mivel a Vercel (és más Serverless szolgáltatók) nem tudnak csatlakozni dedikált VPN-hez, a PostgreSQL (5432), a PgBouncer (6432) és a Valkey (6379) nyers TCP portjai a host gépen ("a világ felé") is nyitva maradnak. Ez iparági standard megoldás Serverless környezeteknél, melynek biztonságát a következő beépített elemek garantálják:
+- A Coolify által a `.env` fájlban legenerált jelszavak 64 karakteres kriptográfiai kulcsok (brute-forceolhatatlanok).
+- A Valkey konfigurálásánál eleve "amputálva" vannak a veszélyes parancsok (pl. `FLUSHALL`, `CONFIG`), így külső támadó az összes teoretikus kaput zárva találja.

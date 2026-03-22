@@ -61,23 +61,14 @@ services:
   garage:
     image: dxflrs/garage:v1.1.0
     restart: unless-stopped
+    command: ["/garage", "-c", "/etc/garage.toml", "server"]
     volumes:
       - "/opt/infrakit/data/designflow/garage/data:/var/lib/garage/data"
       - "/opt/infrakit/data/designflow/garage/meta:/var/lib/garage/meta"
+      - "./init/garage/garage.toml:/etc/garage.toml:ro"
     environment:
-      GARAGE_METADATA_DIR: "/var/lib/garage/meta"
-      GARAGE_DATA_DIR: "/var/lib/garage/data"
-      GARAGE_DB_ENGINE: "lmdb"
-      GARAGE_REPLICATION_FACTOR: "1"
       GARAGE_RPC_SECRET: ${SERVICE_PASSWORD_64_GARAGE_RPC}
-      GARAGE_RPC__BIND_ADDR: "0.0.0.0:3901"
-      GARAGE_ADMIN__API_BIND_ADDR: "0.0.0.0:3903"
       GARAGE_ADMIN_TOKEN: ${SERVICE_PASSWORD_64_GARAGE_ADMIN}
-      GARAGE_S3_API__API_BIND_ADDR: "0.0.0.0:3900"
-      GARAGE_S3_API__S3_REGION: "garage"
-      GARAGE_S3_API__ROOT_DOMAIN: ".s3.garage.localhost"
-      GARAGE_S3_WEB__BIND_ADDR: "0.0.0.0:3902"
-      GARAGE_S3_WEB__ROOT_DOMAIN: ".web.garage.localhost"
     networks:
       - infrakit
     labels:

@@ -32,7 +32,7 @@ infrakit/
 │   │   ├── 01-extensions.sql # PG extension-ök (pgcrypto, pg_trgm, stb.)
 │   │   └── 02-glitchtip-db.sql # GlitchTip külön DB
 │   ├── garage/
-│   │   └── garage.toml       # Garage S3 konfiguráció
+│   │   └── garage.toml       # Garage S3 konfiguráció (bind mount: /etc/garage.toml)
 │   └── caddy/
 │       └── Caddyfile         # Belső Tailscale port proxy
 └── infrapanel/               # Saját műszerfal (TanStack Start)

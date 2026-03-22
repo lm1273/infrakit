@@ -29,6 +29,14 @@ function tcpPing(host: string, port: number, timeoutMs = 2000): Promise<{ isUp: 
   });
 }
 
+function formatExternalUrl(domain: string | undefined): string {
+  if (!domain) return '#';
+  if (domain.startsWith('http://') || domain.startsWith('https://')) {
+    return domain;
+  }
+  return `https://${domain}`;
+}
+
 const getServiceHealth = createServerFn({ method: 'GET' }).handler(async () => {
   // Párhuzamos TCP pingek a Docker hálózaton lévő szolgáltatásokhoz
   const [pg, bouncer, cache, s3] = await Promise.all([
@@ -44,10 +52,10 @@ const getServiceHealth = createServerFn({ method: 'GET' }).handler(async () => {
     valkey: { status: cache.isUp ? 'healthy' : 'down', name: 'Valkey Cache', latency: cache.latency, uptime: cache.isUp ? 'Online' : 'Offline' },
     garage: { status: s3.isUp ? 'healthy' : 'down', name: 'Garage S3', latency: s3.latency, uptime: s3.isUp ? 'Online' : 'Offline' },
     externalLinks: {
-      glitchtip: process.env.GLITCHTIP_DOMAIN || '#',
-      filestash: process.env.FILESTASH_DOMAIN || '#',
-      uptimeKuma: process.env.UPTIME_KUMA_DOMAIN || '#',
-      adminer: process.env.ADMINER_DOMAIN || '#',
+      glitchtip: formatExternalUrl(process.env.GLITCHTIP_DOMAIN),
+      filestash: formatExternalUrl(process.env.FILESTASH_DOMAIN),
+      uptimeKuma: formatExternalUrl(process.env.UPTIME_KUMA_DOMAIN),
+      adminer: formatExternalUrl(process.env.ADMINER_DOMAIN),
     }
   };
 });

@@ -80,11 +80,14 @@ Mielőtt bármit tennél a felületen, ki kell osztani ezeket a szerveren!
     # 2. Postgres jogosultság delegálása (az 1000-res és 999-es UID a legtöbb DB image standardja)
     chown -R 999:999 /opt/infrakit/data/designflow/postgres
     chmod -R 700 /opt/infrakit/data/designflow/postgres
-    
+
     # 3. Garage beállítások (a biztoság kedvéért olvasási és írási engedély az alkalmazásnak)
     chmod -R 777 /opt/infrakit/data/designflow/garage
     chmod -R 777 /opt/infrakit/data/designflow/valkey
     ```
+
+> **Megjegyzés:** A `setup.sh` script ezt mind automatikusan elvégzi, beleértve a Garage konfigurációs fájl másolását a `/opt/infrakit/config/garage.toml` helyre. Ez szükséges mert a Coolify a deploy során nem a repo fájljait, hanem a perzisztens host könyvtárat használja bind mount forrásként.
+
 Kész, a VPS szerver elő van készítve!
 
 ---

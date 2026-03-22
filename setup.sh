@@ -21,7 +21,12 @@ mkdir -p "$TARGET_DIR/garage/meta"
 mkdir -p "$TARGET_DIR/uptime-kuma"
 mkdir -p "$TARGET_DIR/filestash"
 mkdir -p "$TARGET_DIR/tailscale"
+mkdir -p /opt/infrakit/config
 mkdir -p ./init/caddy # Lokális konfigurációs mappa biztosítása
+
+# Garage konfiguráció másolása a perzisztens helyre
+echo "📋 Garage konfiguráció másolása..."
+cp "$(dirname "$0")/init/garage/garage.toml" /opt/infrakit/config/garage.toml
 
 # PostgreSQL jogosultság beállítása (999:999 UID/GID)
 # EZ KRITIKUS: ha a Docker hozza létre, root lesz, és a DB Permission Denied hibával nem indul el.

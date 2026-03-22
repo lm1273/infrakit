@@ -7,14 +7,14 @@ echo "Starting InfraKit Stack initialization..."
 echo "Waiting for Postgres at postgres:5432..."
 # We use PG_PASSWORD because PGPASSWORD is the env var names for psql
 export PGPASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
-until psql -h postgres -U ${DB_USER:-app} -d postgres -c "select 1" > /dev/null 2>&1; do
+until psql -h postgres -U ${DB_USER:-app} -d ${DB_NAME:-app} -c "select 1" > /dev/null 2>&1; do
   sleep 2
   echo "Still waiting for Postgres..."
 done
 
 echo "Postgres is up! Ensuring 'glitchtip' database exists..."
-psql -h postgres -U ${DB_USER:-app} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'glitchtip'" | grep -q 1 || \
-psql -h postgres -U ${DB_USER:-app} -d postgres -c "CREATE DATABASE glitchtip"
+psql -h postgres -U ${DB_USER:-app} -d ${DB_NAME:-app} -tc "SELECT 1 FROM pg_database WHERE datname = 'glitchtip'" | grep -q 1 || \
+psql -h postgres -U ${DB_USER:-app} -d ${DB_NAME:-app} -c "CREATE DATABASE glitchtip"
 
 # 2. Wait for Garage to be ready
 echo "Waiting for Garage API at http://garage:3903..."

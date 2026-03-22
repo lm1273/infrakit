@@ -178,11 +178,10 @@ services:
 
   # -- Caddy --
   caddy-internal:
-    image: caddy:alpine
+    build:
+      context: ./init/caddy
+      dockerfile: Dockerfile
     restart: unless-stopped
-    volumes:
-      - "./init/caddy/Caddyfile.conf:/etc/caddy/Caddyfile_infrakit:ro"
-    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile_infrakit", "--adapter", "caddyfile"]
     networks:
       - infrakit
     depends_on:
